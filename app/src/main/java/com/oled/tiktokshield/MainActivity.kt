@@ -20,27 +20,27 @@ class MainActivity : AppCompatActivity() {
         }
 
         val btnOverlay = Button(this).apply {
-            text = "1. Дать доступ: Поверх других окон"
+            text = "1. Поверх других окон"
             setOnClickListener {
                 startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             }
         }
 
         val btnAccess = Button(this).apply {
-            text = "2. Дать доступ: Спец. возможности"
+            text = "2. Включить спец. возможности"
             setOnClickListener {
                 startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                Toast.makeText(this@MainActivity, "Найдите 'TikTok OLED Shield' и включите", Toast.LENGTH_LONG).show()
             }
         }
 
         val btnEdit = Button(this).apply {
-            text = "3. Настроить положение (Вкл/Выкл режим перетаскивания)"
+            text = "3. Настроить размер и место (Вкл/Выкл)"
             setOnClickListener {
-                val intent = Intent(this@MainActivity, OverlayService::class.java).apply {
-                    action = OverlayService.ACTION_TOGGLE_EDIT
+                val intent = Intent(this@MainActivity, TikTokDetectService::class.java).apply {
+                    action = "TOGGLE_EDIT"
                 }
                 startService(intent)
+                Toast.makeText(this@MainActivity, "Тяните плашку для сдвига, а желтый угол ⇲ для размера!", Toast.LENGTH_LONG).show()
             }
         }
 
