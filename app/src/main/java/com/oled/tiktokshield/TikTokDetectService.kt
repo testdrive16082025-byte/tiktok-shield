@@ -24,17 +24,6 @@ class TikTokDetectService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var isEditMode = false
 
-    // Системные процессы и клавиатуры, на которые нельзя реагировать
-    private val ignoredPackages = setOf(
-        "android",
-        "com.android.systemui",
-        "com.miui.securitycenter",
-        "com.google.android.inputmethod.latin",
-        "com.sohu.inputmethod.sogou",
-        "com.touchtype.swiftkey",
-        "com.yandex.keyboard"
-    )
-
     private val hideRunnable = Runnable {
         hideOverlays()
     }
@@ -45,7 +34,6 @@ class TikTokDetectService : AccessibilityService() {
         prefs = getSharedPreferences("OLED_PREFS", Context.MODE_PRIVATE)
     }
 
-    // Проверка, является ли открытое приложение TikTok-ом
     private fun isTikTokApp(pkg: String): Boolean {
         val lower = pkg.lowercase()
         return lower.contains("musically") || lower.contains("tiktok") || lower.contains("trill") || lower.contains("aweme")
@@ -56,33 +44,46 @@ class TikTokDetectService : AccessibilityService() {
 
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val pkg = event.packageName?.toString() ?: return
+            val className = event.className?.toString() ?: ""
 
-            // 1. САМОЕ ГЛАВНОЕ: Игнорируем появление собственных плашек!
+            // Игнорируем собственные плашки
             if (pkg == packageName) return
 
-            // 2. Игнорируем системные шторки, громкость и клавиатуры
-            if (ignoredPackages.contains(pkg)) return
+            // ГЛАВНЫЙ ФИЛЬТР: Реагируем ТОЛЬКО на реальное открытие экрана приложения или рабочего стола
+            val isRealScreen = className.contains("Activity") || 
+                               className.contains("Launcher") || 
+                               className.contains("Home")
 
-            // 3. Если это TikTok — показываем плашки и держим их
             if (isTikTokApp(pkg)) {
+                // Мы в TikTok: держим плашки включенными железобетонно
                 handler.removeCallbacks(hideRunnable)
                 showOverlays()
-            } else {
-                // Если мы реально вышли на рабочий стол или в другое приложение
+            } else if (isRealScreen) {
+                // Только если открылся РЕАЛЬНЫЙ рабочий стол или другое приложение (Telegram, YouTube)
                 handler.removeCallbacks(hideRunnable)
-                handler.postDelayed(hideRunnable, 400)
+                handler.postDelayed(hideRunnable, 300)
             }
+            // Весь системный мусор MIUI без признака Activity/Launcher теперь просто игнорируется!
         }
     }
 
     override fun onStartCommand(intent: android.content.Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == "TOGGLE_EDIT") {
-            isEditMode = !isEditMode
-            if (isEditMode) {
+        when (intent?.action) {
+            "TOGGLE_EDIT" -> {
+                isEditMode = !isEditMode
+                if (isEditMode) {
+                    handler.removeCallbacks(hideRunnable)
+                    showOverlays()
+                }
+                updateViewsMode()
+            }
+            "FORCE_SHOW" -> {
                 handler.removeCallbacks(hideRunnable)
                 showOverlays()
             }
-            updateViewsMode()
+            "FORCE_HIDE" -> {
+                hideOverlays()
+            }
         }
         return START_STICKY
     }
@@ -116,7 +117,6 @@ class TikTokDetectService : AccessibilityService() {
             setBackgroundColor(if (isEditMode) Color.parseColor("#99FF0000") else Color.BLACK)
         }
 
-        // Желтый угол для изменения РАЗМЕРА
         val resizeHandle = TextView(this).apply {
             text = " ⇲ "
             textSize = 20f
@@ -161,7 +161,6 @@ class TikTokDetectService : AccessibilityService() {
             }
         })
 
-        // Перемещение плашки и скрытие при тапе
         container.setOnTouchListener(object : View.OnTouchListener {
             private var initX = 0
             private var initY = 0
@@ -190,7 +189,6 @@ class TikTokDetectService : AccessibilityService() {
                         }
                     }
                 } else {
-                    // Боевой режим: одиночный тап на плашку
                     when (event.action) {
                         MotionEvent.ACTION_DOWN -> {
                             touchX = event.rawX
@@ -199,7 +197,6 @@ class TikTokDetectService : AccessibilityService() {
                         }
                         MotionEvent.ACTION_UP -> {
                             if (abs(event.rawX - touchX) < 30 && abs(event.rawY - touchY) < 30) {
-                                // Прячем плашку на 4 секунды и пропускаем нажатия насквозь
                                 container.visibility = View.INVISIBLE
                                 params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                                 windowManager.updateViewLayout(container, params)
