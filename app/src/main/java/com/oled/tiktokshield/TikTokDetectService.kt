@@ -46,24 +46,19 @@ class TikTokDetectService : AccessibilityService() {
             val pkg = event.packageName?.toString() ?: return
             val className = event.className?.toString() ?: ""
 
-            // Игнорируем собственные плашки
             if (pkg == packageName) return
 
-            // ГЛАВНЫЙ ФИЛЬТР: Реагируем ТОЛЬКО на реальное открытие экрана приложения или рабочего стола
             val isRealScreen = className.contains("Activity") || 
                                className.contains("Launcher") || 
                                className.contains("Home")
 
             if (isTikTokApp(pkg)) {
-                // Мы в TikTok: держим плашки включенными железобетонно
                 handler.removeCallbacks(hideRunnable)
                 showOverlays()
             } else if (isRealScreen) {
-                // Только если открылся РЕАЛЬНЫЙ рабочий стол или другое приложение (Telegram, YouTube)
                 handler.removeCallbacks(hideRunnable)
                 handler.postDelayed(hideRunnable, 300)
             }
-            // Весь системный мусор MIUI без признака Activity/Launcher теперь просто игнорируется!
         }
     }
 
@@ -77,13 +72,6 @@ class TikTokDetectService : AccessibilityService() {
                 }
                 updateViewsMode()
             }
-            "FORCE_SHOW" -> {
-                handler.removeCallbacks(hideRunnable)
-                showOverlays()
-            }
-            "FORCE_HIDE" -> {
-                hideOverlays()
-            }
         }
         return START_STICKY
     }
@@ -92,7 +80,7 @@ class TikTokDetectService : AccessibilityService() {
         if (overlayViews.isNotEmpty()) return
 
         createBox(0, 50, 1800, 980, 250) // Низ
-        createBox(1, 860, 800, 220, 850)  // Кнопки справа
+        createBox(1, 860, 800, 220, 850)  // Справа
         createBox(2, 200, 80, 680, 160)   // Верх
     }
 
@@ -146,7 +134,9 @@ class TikTokDetectService : AccessibilityService() {
                     MotionEvent.ACTION_MOVE -> {
                         params.width = (initW + (event.rawX - touchX).toInt()).coerceAtLeast(100)
                         params.height = (initH + (event.rawY - touchY).toInt()).coerceAtLeast(80)
-                        windowManager.updateViewLayout(container, params)
+                        try {
+                            windowManager.updateViewLayout(container, params)
+                        } catch (e: Exception) {}
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
@@ -180,7 +170,9 @@ class TikTokDetectService : AccessibilityService() {
                         MotionEvent.ACTION_MOVE -> {
                             params.x = initX + (event.rawX - touchX).toInt()
                             params.y = initY + (event.rawY - touchY).toInt()
-                            windowManager.updateViewLayout(container, params)
+                            try {
+                                windowManager.updateViewLayout(container, params)
+                            } catch (e: Exception) {}
                             return true
                         }
                         MotionEvent.ACTION_UP -> {
@@ -199,13 +191,17 @@ class TikTokDetectService : AccessibilityService() {
                             if (abs(event.rawX - touchX) < 30 && abs(event.rawY - touchY) < 30) {
                                 container.visibility = View.INVISIBLE
                                 params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                                windowManager.updateViewLayout(container, params)
+                                try {
+                                    windowManager.updateViewLayout(container, params)
+                                } catch (e: Exception) {}
 
                                 container.postDelayed({
                                     if (container.isAttachedToWindow && !isEditMode) {
                                         params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
                                         container.visibility = View.VISIBLE
-                                        windowManager.updateViewLayout(container, params)
+                                        try {
+                                            windowManager.updateViewLayout(container, params)
+                                        } catch (e: Exception) {}
                                     }
                                 }, 4000)
                             }
@@ -218,8 +214,10 @@ class TikTokDetectService : AccessibilityService() {
         })
 
         container.addView(resizeHandle)
-        windowManager.addView(container, params)
-        overlayViews.add(container)
+        try {
+            windowManager.addView(container, params)
+            overlayViews.add(container)
+        } catch (e: Exception) {}
     }
 
     private fun updateViewsMode() {
@@ -238,17 +236,26 @@ class TikTokDetectService : AccessibilityService() {
                 container.setBackgroundColor(Color.BLACK)
                 handle.visibility = View.GONE
             }
-            windowManager.updateViewLayout(container, params)
+            try {
+                windowManager.updateViewLayout(container, params)
+            } catch (e: Exception) {}
         }
     }
 
     private fun hideOverlays() {
         if (!isEditMode) {
             overlayViews.forEach {
-                if (it.isAttachedToWindow) windowManager.removeView(it)
+                try {
+                    if (it.isAttachedToWindow) windowManager.removeView(it)
+                } catch (e: Exception) {}
             }
             overlayViews.clear()
         }
+    }
+
+    override fun onDestroy() {
+        hideOverlays()
+        super.onDestroy()
     }
 
     override fun onInterrupt() {}
