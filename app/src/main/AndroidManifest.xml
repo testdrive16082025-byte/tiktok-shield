@@ -18,12 +18,9 @@
         </activity>
 
         <service
-            android:name=".OverlayService"
-            android:exported="false" />
-
-        <service
             android:name=".TikTokDetectService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:process=":shield_service"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
